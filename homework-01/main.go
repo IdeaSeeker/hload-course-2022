@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
@@ -13,7 +12,6 @@ import (
 const (
 	SQL_DRIVER      = "postgres"
 	SQL_CONNECT_URL = "user=postgres password=123 dbname=hloaddb sslmode=disable"
-	abc             = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 
 type CreateRequest struct {
@@ -31,7 +29,7 @@ func setupRouter(db_conn *sql.DB) *gin.Engine {
 		tinyurl := c.Params.ByName("url")
 
 		longurl := ""
-		longurl_id := tinyurl_to_longurl_id(tinyurl)
+		longurl_id := TinyurlToLongurlId(tinyurl)
 		err := db_conn.QueryRow("select longurl from Redirect where id = $1", longurl_id).Scan(&longurl)
 		if err != nil {
 			c.Writer.WriteHeader(404)
@@ -61,32 +59,12 @@ func setupRouter(db_conn *sql.DB) *gin.Engine {
 			c.JSON(http.StatusInternalServerError, gin.H{"response": "Database internal error: " + err.Error()})
 			return
 		}
-		tinyurl := longurl_id_tinyurl(int64(longurl_id))
+		tinyurl := LongurlIdToTinyurl(int64(longurl_id))
 
 		c.JSON(http.StatusOK, gin.H{"longurl": longurl, "tinyurl": tinyurl})
 	})
 
 	return r
-}
-
-func longurl_id_tinyurl(longurl_id int64) string {
-	tinyurl := ""
-	for longurl_id > 0 {
-		tinyurl = string(abc[longurl_id%int64(len(abc))]) + tinyurl
-		longurl_id /= int64(len(abc))
-	}
-	for len(tinyurl) < 7 {
-		tinyurl = string(abc[0]) + tinyurl
-	}
-	return tinyurl
-}
-
-func tinyurl_to_longurl_id(tinyurl string) int64 {
-	longurl_id := int64(0)
-	for _, c := range tinyurl {
-		longurl_id = longurl_id*int64(len(abc)) + int64(strings.IndexRune(abc, c))
-	}
-	return longurl_id
 }
 
 func main() {
