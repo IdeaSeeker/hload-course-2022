@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 const abc = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -22,4 +25,10 @@ func TinyurlToLongurlId(tinyurl string) int64 {
 		longurl_id = longurl_id*int64(len(abc)) + int64(strings.IndexRune(abc, c))
 	}
 	return longurl_id
+}
+
+func MeasureTime(block func ()) float64 {
+	start := time.Now()
+	block()
+	return float64(time.Since(start).Nanoseconds()) / 1000
 }
