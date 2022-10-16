@@ -27,8 +27,8 @@ func TinyurlToLongurlId(tinyurl string) int64 {
 	return longurl_id
 }
 
-func MeasureTime(block func ()) float64 {
+func MeasureSeconds(block func()) float64 {
 	start := time.Now()
 	block()
-	return float64(time.Since(start).Nanoseconds()) / 1000
+	return time.Since(start).Seconds()
 }
