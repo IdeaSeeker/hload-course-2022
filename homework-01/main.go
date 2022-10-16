@@ -1,21 +1,21 @@
 package main
 
 import (
-	"database/sql"
-	"fmt"
-	"net/http"
+    "database/sql"
+    "fmt"
+    "net/http"
 
-	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
+    "github.com/gin-gonic/gin"
+    _ "github.com/lib/pq"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promauto"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
-	SQL_DRIVER      = "postgres"
-	SQL_CONNECT_URL = "user=postgres password=123 dbname=hloaddb sslmode=disable"
+    SQL_DRIVER      = "postgres"
+    SQL_CONNECT_URL = "user=postgres password=123 dbname=hloaddb sslmode=disable"
 )
 
 var (
@@ -24,21 +24,21 @@ var (
         Help: "The total number of processed /:url queries",
     })
     urlOpsElapsedTime = promauto.NewSummary(prometheus.SummaryOpts{
-		Name: "url_ops_time",
-		Help: "Time of /:url query processing",
-	})
+        Name: "url_ops_time",
+        Help: "Time of /:url query processing",
+    })
     createOpsProcessed = promauto.NewCounter(prometheus.CounterOpts{
         Name: "create_ops_total",
         Help: "The total number of processed /create queries",
     })
     createOpsElapsedTime = promauto.NewSummary(prometheus.SummaryOpts{
-		Name: "create_ops_time",
-		Help: "Time of /create query processing",
-	})
+        Name: "create_ops_time",
+        Help: "Time of /create query processing",
+    })
 )
 
 type CreateRequest struct {
-	Longurl string `json:"longurl"`
+    Longurl string `json:"longurl"`
 }
 
 func urlHandle(c *gin.Context, db_conn *sql.DB) {
@@ -81,25 +81,25 @@ func createHandle(c *gin.Context, db_conn *sql.DB) {
 }
 
 func setupRouter(db_conn *sql.DB) *gin.Engine {
-	r := gin.Default()
+    r := gin.Default()
 
-	r.GET("/ping", func(c *gin.Context) {
-		c.String(http.StatusOK, "pong")
-	})
+    r.GET("/ping", func(c *gin.Context) {
+        c.String(http.StatusOK, "pong")
+    })
 
-	r.GET("/:url", func(c *gin.Context) {
+    r.GET("/:url", func(c *gin.Context) {
         urlOpsProcessed.Inc()
-		elapsed := MeasureTime(func() { urlHandle(c, db_conn) })
+        elapsed := MeasureTime(func() { urlHandle(c, db_conn) })
         urlOpsElapsedTime.Observe(elapsed)
-	})
+    })
 
-	r.PUT("/create", func(c *gin.Context) {
+    r.PUT("/create", func(c *gin.Context) {
         createOpsProcessed.Inc()
-		elapsed := MeasureTime(func() { createHandle(c, db_conn) })
+        elapsed := MeasureTime(func() { createHandle(c, db_conn) })
         createOpsElapsedTime.Observe(elapsed)
-	})
+    })
 
-	return r
+    return r
 }
 
 func main() {
@@ -118,13 +118,13 @@ func main() {
 
     _, err = db_conn.Exec("create table if not exists Redirect(id serial, longurl varchar unique)")
     if err != nil {
-		fmt.Println("Failed to create table", err)
-		panic("exit")
-	}
+        fmt.Println("Failed to create table", err)
+        panic("exit")
+    }
 
     http.Handle("/metrics", promhttp.Handler())
     go http.ListenAndServe(":2112", nil)
 
-	r := setupRouter(db_conn)
-	r.Run(":8080")
+    r := setupRouter(db_conn)
+    r.Run(":8080")
 }
