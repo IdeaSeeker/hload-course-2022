@@ -59,7 +59,7 @@ func createHandle(c *gin.Context, db_conn *sql.DB) {
     body := CreateRequest{}
     err := c.BindJSON(&body)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, "Wrong JSON format: "+err.Error())
+        c.JSON(http.StatusInternalServerError, "Wrong JSON format: " + err.Error())
     }
     longurl := body.Longurl
 
