@@ -61,7 +61,7 @@ func createHandle(c *gin.Context, db_conn *sql.DB) {
     }
     tinyurl := LongurlIdToTinyurl(int64(longurl_id))
 
-    // KafkaPushUrls(tinyurl, longurl)
+    KafkaPushUrls(tinyurl, longurl)
 
     c.JSON(http.StatusOK, gin.H{"longurl": longurl, "tinyurl": tinyurl})
 }
@@ -116,7 +116,7 @@ func RunServer() {
 }
 
 func RunWorker() {
-    // go KafkaRunConsumer()
+    go KafkaRunConsumer()
 
     r := setupWorkerRouter()
     r.Run(WORKER_HOST)
