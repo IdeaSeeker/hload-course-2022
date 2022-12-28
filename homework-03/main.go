@@ -4,9 +4,18 @@ import (
     "database/sql"
     "fmt"
     "net/http"
+    "os"
 
     "github.com/gin-gonic/gin"
     _ "github.com/lib/pq"
+)
+
+const (
+    USERNAME   = "nstroganov"
+    SERVER_HOST = ":8080"
+    WORKER_HOST = ":8081"
+    REDIS_HOST = "..."
+    KAFKA_HOST = "..."
 )
 
 const (
@@ -18,12 +27,10 @@ type CreateRequest struct {
     Longurl string `json:"longurl"`
 }
 
-func urlHandle(c *gin.Context, db_conn *sql.DB) {
+func urlHandle(c *gin.Context) {
     tinyurl := c.Params.ByName("url")
 
-    longurl := ""
-    longurl_id := TinyurlToLongurlId(tinyurl)
-    err := db_conn.QueryRow("select longurl from Redirect where id = $1", longurl_id).Scan(&longurl)
+    longurl, err := RedisGetLongurl(tinyurl)
     if err != nil {
         c.Writer.WriteHeader(404)
         return
@@ -36,7 +43,7 @@ func createHandle(c *gin.Context, db_conn *sql.DB) {
     body := CreateRequest{}
     err := c.BindJSON(&body)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, "Wrong JSON format: " + err.Error())
+        c.JSON(http.StatusInternalServerError, "Wrong JSON format: "+err.Error())
     }
     longurl := body.Longurl
 
@@ -54,18 +61,16 @@ func createHandle(c *gin.Context, db_conn *sql.DB) {
     }
     tinyurl := LongurlIdToTinyurl(int64(longurl_id))
 
+    // KafkaPushUrls(tinyurl, longurl)
+
     c.JSON(http.StatusOK, gin.H{"longurl": longurl, "tinyurl": tinyurl})
 }
 
-func setupRouter(db_conn *sql.DB) *gin.Engine {
+func setupServerRouter(db_conn *sql.DB) *gin.Engine {
     r := gin.Default()
 
     r.GET("/ping", func(c *gin.Context) {
         c.String(http.StatusOK, "pong")
-    })
-
-    r.GET("/:url", func(c *gin.Context) {
-        urlHandle(c, db_conn)
     })
 
     r.PUT("/create", func(c *gin.Context) {
@@ -75,26 +80,57 @@ func setupRouter(db_conn *sql.DB) *gin.Engine {
     return r
 }
 
-func main() {
+func setupWorkerRouter() *gin.Engine {
+    r := gin.Default()
+
+    r.GET("/ping", func(c *gin.Context) {
+        c.String(http.StatusOK, "pong")
+    })
+
+    r.GET("/:url", func(c *gin.Context) {
+        urlHandle(c)
+    })
+
+    return r
+}
+
+func RunServer() {
     fmt.Println(sql.Drivers())
     db_conn, err := sql.Open(SQL_DRIVER, SQL_CONNECT_URL)
     if err != nil {
-        fmt.Println("Failed to open", err)
-        panic("exit")
+        panic(err)
     }
 
     err = db_conn.Ping()
     if err != nil {
-        fmt.Println("Failed to ping database", err)
-        panic("exit")
+        panic(err)
     }
 
     _, err = db_conn.Exec("create table if not exists Redirect(id serial, longurl varchar unique)")
     if err != nil {
-        fmt.Println("Failed to create table", err)
-        panic("exit")
+        panic(err)
     }
 
-    r := setupRouter(db_conn)
-    r.Run(":8080")
+    r := setupServerRouter(db_conn)
+    r.Run(SERVER_HOST)
+}
+
+func RunWorker() {
+    // go KafkaRunConsumer()
+
+    r := setupWorkerRouter()
+    r.Run(WORKER_HOST)
+}
+
+func main() {
+    strategy := os.Args[len(os.Args) - 1]
+
+    if strategy == "server" {
+        RunServer()
+    } else if strategy == "worker" {
+        RunWorker()
+    } else {
+        fmt.Println("Expected exactly one argument: 'server' or 'worker'")
+        panic("Unknown strategy: " + strategy)
+    }
 }
