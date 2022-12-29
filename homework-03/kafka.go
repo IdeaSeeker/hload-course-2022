@@ -1,95 +1,121 @@
 package main
 
 import (
-    "fmt"
-    "net"
-    "strings"
-    "time"
+	"context"
+	"fmt"
 
-    "github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/segmentio/kafka-go"
 )
 
 const (
     KAFKA_URL_TOPIC_NAME = USERNAME + "-url-topic"
+	KAFKA_CLICKS_TOPIC_NAME = USERNAME + "-clicks-topic"
 )
 
-var kafkaConfig kafka.ConfigMap = kafka.ConfigMap{
-    "bootstrap.servers":  KAFKA_HOST,
-    "group.id":           getGroutId(),
-    "auto.offset.reset":  "earliest",
-    "enable.auto.commit": "false",
-}
+var cntx = context.Background()
 
-var kafkaProducer *kafka.Producer = func() *kafka.Producer {
-    p, err := kafka.NewProducer(&kafkaConfig)
-    if err != nil {
-        panic(err)
-    }
+var kafkaUrlConsumer *kafka.Reader
+var kafkaUrlProducer *kafka.Writer = initKafkaProducer(KAFKA_URL_TOPIC_NAME)
 
-    return p
-}()
+var kafkaClicksConsumer *kafka.Reader
+var kafkaClicksProducer *kafka.Writer = initKafkaProducer(KAFKA_CLICKS_TOPIC_NAME)
 
-var kafkaConsumer *kafka.Consumer = func() *kafka.Consumer {
-    c, err := kafka.NewConsumer(&kafkaConfig)
-    if err != nil {
-        panic(err)
-    }
-
-    err = c.SubscribeTopics([]string{KAFKA_URL_TOPIC_NAME}, nil)
-    if err != nil {
-        panic(err)
-    }
-
-    return c
-}()
+// urls
 
 func KafkaPushUrls(tinyurl string, longurl string) {
-    topic := KAFKA_URL_TOPIC_NAME
-    message := constructKafkaMessage(tinyurl, longurl)
+	err := kafkaUrlProducer.WriteMessages(cntx,
+		kafka.Message{
+			Key:   []byte(tinyurl),
+			Value: []byte(longurl),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("kafkaUrlProducer: pushed {" + tinyurl + ", " + longurl + "}")
+}
 
-    err := kafkaProducer.Produce(&kafka.Message{
-        TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-        Value:          []byte(message),
-    }, nil)
-    if err != nil {
-        panic(err)
+func KafkaRunUrlConsumer(groupId string) {
+	kafkaUrlConsumer = initKafkaConsumer(KAFKA_URL_TOPIC_NAME, groupId)
+	for {
+		message, err := kafkaUrlConsumer.FetchMessage(cntx)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		tinyurl, longurl := string(message.Key), string(message.Value)
+		fmt.Println("KafkaUrlConsumer: read {" + tinyurl + ", " + longurl + "}")
+
+		err = RedisSetUrls(tinyurl, longurl)
+		if err != nil {
+			panic(err)
+		}
+        fmt.Println("Redis: set " + tinyurl + " -> " + longurl)
+
+		err = kafkaUrlConsumer.CommitMessages(cntx, message)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+// clicks
+
+func KafkaPushClicks(tinyurl string, plusClicksNumber int64) {
+    clicksString := fmt.Sprint(plusClicksNumber)
+	err := kafkaClicksProducer.WriteMessages(cntx,
+		kafka.Message{
+			Key:   []byte(tinyurl),
+			Value: []byte(clicksString),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("kafkaClicksProducer: pushed {" + tinyurl + ", " + clicksString + "}")
+}
+
+func KafkaRunClicksConsumer(groupId string) {
+	kafkaClicksConsumer = initKafkaConsumer(KAFKA_CLICKS_TOPIC_NAME, groupId)
+	for {
+		message, err := kafkaClicksConsumer.FetchMessage(cntx)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		tinyurl, plusClicksNumber := string(message.Key), string(message.Value)
+		fmt.Println("kafkaClicksConsumer: read {" + tinyurl + ", " + plusClicksNumber + "}")
+
+        err = SqlUpdateClicks(tinyurl, plusClicksNumber)
+		if err != nil {
+			panic(err)
+		}
+        fmt.Println("Sql: updated clicks on " + tinyurl + " by " + plusClicksNumber)
+
+		err = kafkaClicksConsumer.CommitMessages(cntx, message)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+// inits
+
+func initKafkaConsumer(topic string, groupId string) *kafka.Reader {
+	return kafka.NewReader(kafka.ReaderConfig{
+		Brokers:   []string{KAFKA_HOST},
+		GroupID:   groupId,
+		Topic:     topic,
+		Partition: 0,
+	})
+}
+
+func initKafkaProducer(topic string) *kafka.Writer {
+    return &kafka.Writer{
+        Addr:     kafka.TCP(KAFKA_HOST),
+        Topic:    topic,
+        Balancer: &kafka.LeastBytes{},
     }
-}
-
-func KafkaRunConsumer() {
-    for {
-        message, err := kafkaConsumer.ReadMessage(time.Second)
-        if err != nil {
-            fmt.Println(err)
-            continue
-        }
-
-        tinyurl, longurl := deconstructKafkaMessage(string(message.Value))
-        err = RedisSetUrls(tinyurl, longurl)
-        if err != nil {
-            panic(err)
-        }
-
-        _, err = kafkaConsumer.Commit()
-        if err != nil {
-            panic(err)
-        }
-    }
-}
-
-func constructKafkaMessage(tinyurl string, longurl string) string {
-    return tinyurl + "|" + longurl
-}
-
-func deconstructKafkaMessage(message string) (string, string) {
-    splitted := strings.Split(message, "|")
-    return splitted[0], splitted[1]
-}
-
-func getGroutId() string {
-    conn, err := net.Dial("ip:icmp", "ya.ru")
-    if err != nil {
-        panic(err)
-    }
-    return conn.LocalAddr().String()
 }
