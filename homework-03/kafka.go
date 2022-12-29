@@ -8,7 +8,7 @@ import (
 )
 
 const (
-    KAFKA_URL_TOPIC_NAME = USERNAME + "-url-topic"
+    KAFKA_URL_TOPIC_NAME    = USERNAME + "-url-topic"
     KAFKA_CLICKS_TOPIC_NAME = USERNAME + "-clicks-topic"
 )
 
