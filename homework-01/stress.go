@@ -1,28 +1,41 @@
 package main
 
 import (
-    "bytes"
-    "encoding/json"
-    "io/ioutil"
-    "net/http"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"net/http"
+	"strings"
 )
 
+var ok_urls = func() []string {
+    contents, _ := ioutil.ReadFile("urls.txt")
+    return strings.Split(string(contents), "\n")
+}()
+
 func StressUrlGet302() {
-    tinyurl := urlCreate("https://ya.ru")
+    tinyurls := []string {}
+    for _, url := range ok_urls {
+        tinyurls = append(tinyurls, urlCreate(url))
+    }
+
     for i := 0; i < 100000; i++ {
-        urlGet(tinyurl)
+        tinyurl_index := rand.Intn(len(tinyurls))
+        urlGet(tinyurls[tinyurl_index])
     }
 }
 
 func StressUrlGet404() {
     for i := 0; i < 100000; i++ {
-        urlGet("tinyurl")
+        urlGet(randomString(7))
     }
 }
 
 func StressUrlCreate() {
     for i := 0; i < 10000; i++ {
-        urlCreate("https://ya.ru")
+        urlCreate(randomUrl(20))
     }
 }
 
@@ -33,8 +46,14 @@ type CreateResponse struct {
     Tinyurl string
 }
 
+var client = &http.Client{
+    CheckRedirect: func(req *http.Request, via []*http.Request) error {
+        return http.ErrUseLastResponse
+    },
+}
+
 func urlGet(tinyurl string) {
-    http.Get("http://localhost:8080/" + tinyurl)
+    client.Get("http://localhost:8080/" + tinyurl)
 }
 
 func urlCreate(longurl string) string {
@@ -60,3 +79,12 @@ func urlCreate(longurl string) string {
     return createResponse.Tinyurl
 }
 
+func randomString(length int) string {
+    b := make([]byte, length)
+    rand.Read(b)
+    return fmt.Sprintf("%x", b)[:length]
+}
+
+func randomUrl(length int) string {
+    return "https://" + randomString(length) + ".com"
+}

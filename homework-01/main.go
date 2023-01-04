@@ -14,6 +14,11 @@ import (
 )
 
 const (
+    HOST = ""
+    PORT = "8080"
+)
+
+const (
     SQL_DRIVER      = "postgres"
     SQL_CONNECT_URL = "user=postgres password=123 dbname=hloaddb sslmode=disable"
 )
@@ -109,6 +114,7 @@ func setupRouter(db_conn *sql.DB) *gin.Engine {
     return r
 }
 
+// go run main.go util.go stress.go
 func main() {
     fmt.Println(sql.Drivers())
     db_conn, err := sql.Open(SQL_DRIVER, SQL_CONNECT_URL)
@@ -133,5 +139,5 @@ func main() {
     go http.ListenAndServe(":2112", nil)
 
     r := setupRouter(db_conn)
-    r.Run(":8080")
+    r.Run(HOST + ":" + PORT)
 }
