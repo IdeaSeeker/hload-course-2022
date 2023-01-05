@@ -20,7 +20,7 @@ func SqlInitDatabase() error {
     if err != nil {
         return err
     }
-	sqlDB = db_conn
+    sqlDB = db_conn
 
     err = sqlDB.Ping()
     if err != nil {
@@ -33,17 +33,17 @@ func SqlInitDatabase() error {
 
 func SqlInsertLongurl(longurl string) error {
     _, err := sqlDB.Exec("insert into Redirect(longurl) values ($1) on conflict do nothing", longurl)
-	return err
+    return err
 }
 
 func SqlGetLongurlId(longurl string) (int, error) {
-	longurl_id := 0
+    longurl_id := 0
     err := sqlDB.QueryRow("select id from Redirect where longurl = $1", longurl).Scan(&longurl_id)
-	return longurl_id, err
+    return longurl_id, err
 }
 
 func SqlGetLongurl(longurl_id int) (string, error) {
     longurl := ""
     err := sqlDB.QueryRow("select longurl from Redirect where id = $1", longurl_id).Scan(&longurl)
-	return longurl, err
+    return longurl, err
 }

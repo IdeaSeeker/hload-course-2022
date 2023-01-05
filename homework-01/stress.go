@@ -1,13 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"math/rand"
-	"net/http"
-	"strings"
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io/ioutil"
+    "math/rand"
+    "net/http"
+    "strings"
 )
 
 var ok_urls = func() []string {
