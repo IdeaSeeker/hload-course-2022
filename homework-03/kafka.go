@@ -105,17 +105,17 @@ func KafkaRunClicksConsumer(groupId string) {
 
 func initKafkaConsumer(topic string, groupId string) *kafka.Reader {
     return kafka.NewReader(kafka.ReaderConfig{
-        Brokers:   []string{KAFKA_HOST},
-        GroupID:   groupId,
-        Topic:     topic,
-        Partition: 0,
+        Brokers: []string{KAFKA_HOST},
+        GroupID: groupId,
+        Topic:   topic,
     })
 }
 
 func initKafkaProducer(topic string) *kafka.Writer {
     return &kafka.Writer{
-        Addr:     kafka.TCP(KAFKA_HOST),
-        Topic:    topic,
-        Balancer: &kafka.LeastBytes{},
+        Addr:         kafka.TCP(KAFKA_HOST),
+        Topic:        topic,
+        Balancer:     &kafka.LeastBytes{},
+        RequiredAcks: kafka.RequireOne,
     }
 }
